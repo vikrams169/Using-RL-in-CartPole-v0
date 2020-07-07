@@ -114,11 +114,11 @@ class Agent(object):
 				agent.update_network(state_now,action,reward,state_next)
 				#Seeing if the episode terminates
 				if done==True:
+					self.reward_history.append(reward_buffer)
+					self.episode_lengths.append(j)
 					if (i+1)%100==0:
-						self.reward_history.append(reward_buffer)
-						self.episode_lengths.append(j)
-						print("Length of Episode {} : {}".format(i+1,j))
-						print("Total reward claimed by the agent in episode {} : {}".format(i+1,reward_buffer))
+						print("Length of Episode {} : {}".format(i+1,self.episode_lengths[-1]))
+						print("Total reward claimed by the agent in episode {} : {}".format(i+1,self.reward_history[-1]))
 					break
 				else:
 					#Else setting the next timestep's state
