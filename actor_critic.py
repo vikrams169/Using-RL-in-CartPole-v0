@@ -8,29 +8,40 @@ from keras.layers import Input, Dense
 from keras.models import Model
 import keras.backend as k
 from keras.optimizers import Adam
+import matplotlib.pyplot as plt
 import random
 import gym
+
+#A function to keep track of average rewards
+def running_reward_avg(rewards):
+	output=[]
+	for i in range(len(rewards)):
+		output.append(sum(rewards[:i])/(i+1))
+	return output
 
 #Initializing the Agent class which controls the agents behaviour/improvement in the environment
 class Agent(object):
 
 
-	def __init__(self,state_size,action_size,gamma,alpha,n_hl1,n_hl2):
+	def __init__(self,env,gamma=0.98,alpha=0.01):
 
-		self.state_size=state_size									#Number of features describing each state in the environment
-		self.action_size=action_size								#Number of features describing each action in the environment
-		self.gamma=gamma											#Discount factor for future rewards
-		self.alpha=alpha											#Learning rate during training
-		self.n_hl1=n_hl1											#Number of units in the first hidden layer of the network
-		self.n_hl2=n_hl2											#Number of units in the second hidden layer of the network
-		self.actor,self.critic,self.policy=self.build_network()		#Building the networks that output different output layers
+		self.env=env 											#The OpenAI Gym Environment
+		self.state_size=self.env.observation_space.shape[0]		#Number of features describing each state in the environment
+		self.action_size=self.env.action_space.n				#Number of features describing each action in the environment
+		self.gamma=gamma										#Discount factor for future rewards
+		self.alpha=alpha										#Learning rate during training
+		self.n_hl1=32											#Number of units in the first hidden layer of the network
+		self.n_hl2=32											#Number of units in the second hidden layer of the network
+		self.actor,self.critic,self.policy=self.build_network()	#Building the networks that output different output layers
+		self.reward_history=[]									#Reward history to keep track of rewards per episode
+		self.episode_lengths=[]									#To keep track of the length of each episode
 
 
 	#Defining a function that builds the actor, critic, and policy network to train/improve the model
 	def build_network(self):
 
-		inputs=Input(shape=[None,self.state_size])
-		advantage=Input(shape=[None])
+		inputs=Input(shape=[self.state_size])
+		advantage=Input(shape=[1])
 		X=Dense(self.n_hl1,activation='relu')(inputs)
 		X=Dense(self.n_hl2,activation='relu')(X)
 		actor_layer=Dense(self.action_size,activation='softmax')(X)
@@ -39,7 +50,7 @@ class Agent(object):
 		#Defining a custom loss function (in the keras format) for the policy gradient loss
 		def custom_loss(y_pred,y_true):
 			probs=k.clip(y_pred,1e-10,1-1e-10)
-			return k.sum(k.log(probs)*y_true)*advantage
+			return -k.mean(k.log(probs)*y_true)*advantage
 
 		#The policy network takes the state and reward obtained, to calculate probabilities for each action(stochastic policy)
 		actor_model=Model(inputs=[inputs,advantage],outputs=actor_layer)
@@ -53,75 +64,80 @@ class Agent(object):
 		#Training is not done on this network, but on the actor network instead
 		policy_model=Model(inputs=inputs,outputs=actor_layer)
 
-		return self.actor_model,self.critic_model,self.policy_model
+		return actor_model,critic_model,policy_model
 
 
 	#Choosing a greedy action, except certain times randomly (randomness can be modified with changing epsilon)
-	def choose_action(self,state,epsilon)
+	def choose_action(self,state,epsilon=0.2):
 
-		probs=self.policy.predict([state])
+		policy=self.policy.predict(state.reshape([1,self.state_size]))
 		if np.random.rand(1)<epsilon:
-			return np.random.randint(self.action_size)
+			return np.argmax(policy[0])
 		else:
-			return np.argmax(probs[0])
+			return np.random.randint(self.action_size)
 
 
 	#Updating the actor-critic networks after every timestep in an episode
 	def update_network(self,state_now,action,reward,state_next):
 
-		A=np.zeros((self.action_size))
-		A[action]=1
-		state_now_value=self.critic.predict([state_now])
-		state_next_value=self.critic.predict([state_next])
+		state_now=state_now.reshape([1,self.state_size])
+		state_next=state_next.reshape([1,self.state_size])
+		action=(np.eye(self.action_size)[action]).reshape([1,self.action_size])
+		state_now_value=self.critic.predict(state_now)
+		state_next_value=self.critic.predict(state_next)
 		target_value_now=reward+self.gamma*state_next_value
 		advantage=target_value_now-state_now_value
-		self.actor.fit([state_now,advantage],A)
+		self.actor.fit([state_now,advantage],action)
 		self.critic.fit(state_now,target_value_now)
 
 
-#Training the agent over a number of episodes, so it learns the policy to claim maximum reward
-def train_agent(env,agent,num_episodes,epsilon):
+	#Training the agent over a number of episodes, so it learns the policy to claim maximum reward
+	def train(self,num_episodes=5000):
 
-	#Iterating over 'num_episodes'
-	for episode_i in range(num_episodes):
+		#Iterating over 'num_episodes'
+		for i in range(num_episodes):
 
-		#Maintaining a buffer to store the reward obtained throughout each episode
-		reward_history=[]
-		#Resetting the starting state of each episode
-		state_now=env.reset()
-		while True:
-			#Choosing an action as per policy, and going to the next state, claiming reward
-			action=agent.choose_action(state,epsilon)
-			state_next,reward,done,_=env.step(action)
-			#Incrementing the reward history
-			reward_history[-1]+=reward
-			#Updating the networks
-			agent.update_network(state_now,action,reward,state_next)
-			#Seeing if the episode terminates
-			if done==True:
-				if episode_i%100==0:
-					print("Length of Episode {} : {}".format(episode_i,len(reward_history)))
-					print("Average reward claimed by the agent in episode {} : {}".format(episode_i,reward_history[-1]/len(reward_history)))
-				#Appending the reward history to calculate reard in the next episode
-				reward_history.append(0)
-				break
-			else:
-				#Else setting the next timestep's state
-				state_now=state_next
+			#Maintaining a buffer to store the reward obtained throughout each episode
+			reward_buffer=0
+			#Maintaining the count of the length of the episode
+			j=0
+			#Resetting the starting state of each episode
+			state_now=env.reset()
+			while True:
+				#Choosing an action as per policy, and going to the next state, claiming reward
+				action=agent.choose_action(state_now)
+				state_next,reward,done,_=env.step(action)
+				#Incrementing the reward buffer, and step count of the episode
+				reward_buffer+=reward
+				j+=1
+				#Updating the networks
+				agent.update_network(state_now,action,reward,state_next)
+				#Seeing if the episode terminates
+				if done==True:
+					if (i+1)%100==0:
+						self.reward_history.append(reward_buffer)
+						self.episode_lengths.append(j)
+						print("Length of Episode {} : {}".format(i+1,j))
+						print("Total reward claimed by the agent in episode {} : {}".format(i+1,reward_buffer))
+					break
+				else:
+					#Else setting the next timestep's state
+					state_now=state_next
 
 
 #Creating an environment, and an agent
 env=gym.make("CartPole-v1")
-state_size=env.observation_space.shape[0]
-action_size=env.action_space.n
-gamma=0.98
-alpha=0.0001
-n_hl1=64
-n_hl2=128
-num_episodes=2000
-epsilon=0.1
 
-agent=Agent(state_size,action_size,gamma,alpha,n_hl1,n_hl2)
+agent=Agent(env)
 
 #Training the agent using Deep Q-Learning with experience replay with the above mentioned parameters
-train_agent(env,agent,num_episodes,epsilon)
+agent.train()
+
+#Plotting the results
+fig, axs = plt.subplots(1,2)
+axs[0].plot(running_reward_avg(agent.reward_history))
+axs[0].set_title('Average Reward per Episode')
+axs[1].plot(agent.episode_lengths, 'tab:orange')
+axs[1].set_title('Episode_Length')
+
+plt.show()
