@@ -27,4 +27,4 @@ To better play this environment, there are three deep reinforcement learning tec
 <br><center><img src="actor_critic.png"></center>
 <br>
 <br>
-As it can be seen, even when trained much less, actor critic methods can do much better (as written in the paper on A3C by Google DeepMind)!
+As it can be seen, though Deep QLearning and REINFORCE methods give similar results (not always but true in this case), actor critic methods can do much better, in this case, almost twice (as written in the paper on A3C by Google DeepMind)!
