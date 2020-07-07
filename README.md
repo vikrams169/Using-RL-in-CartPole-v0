@@ -1,5 +1,5 @@
 # Using-RL-in-CartPole-v1
-This repository displays the use of Reinforcement Learning, specifically QLearning, REINFORCE, and Advantage Actor Critic (A2C) methods to play CartPole-v0 of OpenAI Gym. 
+This repository displays the use of Reinforcement Learning, specifically QLearning, REINFORCE, and Advantage Actor Critic (A2C) methods to play CartPole-v1 of OpenAI Gym. 
 <br>
 <br>
 The Cart Lake environment can be better explained or reviwed by going to the souce code <a href="https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py">here</a>.
