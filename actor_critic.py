@@ -9,7 +9,7 @@ from keras.models import Model
 import keras.backend as k
 from keras.optimizers import Adam
 import matplotlib.pyplot as plt
-import random
+import random 
 import gym
 
 #A function to keep track of average rewards
@@ -30,8 +30,8 @@ class Agent(object):
 		self.action_size=self.env.action_space.n				#Number of features describing each action in the environment
 		self.gamma=gamma										#Discount factor for future rewards
 		self.alpha=alpha										#Learning rate during training
-		self.n_hl1=32											#Number of units in the first hidden layer of the network
-		self.n_hl2=32											#Number of units in the second hidden layer of the network
+		self.n_hl1=16											#Number of units in the first hidden layer of the network
+		self.n_hl2=16											#Number of units in the second hidden layer of the network
 		self.actor,self.critic,self.policy=self.build_network()	#Building the networks that output different output layers
 		self.reward_history=[]									#Reward history to keep track of rewards per episode
 		self.episode_lengths=[]									#To keep track of the length of each episode
